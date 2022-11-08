@@ -1,12 +1,80 @@
 Parameters:
-  Tag:
+  KeyName:
+    Description: Amazon EC2 KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+  Tag: 
     Type: String
 
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-1853ac65
+    us-west-1:
+      AMI: ami-bf5540df
+    eu-west-1:
+      AMI: ami-3bfab942
+    ap-southeast-1:
+      AMI: ami-e2adf99e
+    ap-southeast-2:
+      AMI: ami-43874721
+    ap-south-1:
+      AMI: ami-0ebc1ac48dfd14136
+
 Resources: 
+  
+  BastionEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId:
+        Fn::FindInMap:
+          - RegionMap
+          - !Ref AWS::Region
+          - AMI
+      Tags:
+        - Key: Name
+          Value: "Bastion Host"
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - Ref: "MySecurityGroup"
+          SubnetId:
+            Ref: "PublicSubnet"
+
+  PrivateEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId:
+        Fn::FindInMap:
+          - RegionMap
+          - !Ref AWS::Region
+          - AMI
+      SecurityGroupIds:
+        - !Ref MySecurityGroup
+      SubnetId: !Ref PrivateSubnet
+      Tags:
+        - Key: Name
+          Value: "Private Instance"
+      KeyName: !Ref KeyName          
+  
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open Port 22 for ssh
+      VpcId: !Ref "VPC" 
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: "22"
+          ToPort: "22"
+          CidrIp: 0.0.0.0/0
   VPC:
     Type: "AWS::EC2::VPC"
     Properties:
       CidrBlock: "10.0.0.0/16"
+      InstanceTenancy: "default"
       Tags:
       - Key: "Name"
         Value: !Ref "Tag"
@@ -21,15 +89,22 @@ Resources:
       VpcId: !Ref "VPC"
       CidrBlock: "10.0.0.0/24"
 
+      
+
   PublicSubnet:
     Type: "AWS::EC2::Subnet"
     Properties:
       AvailabilityZone: !Select 
-        - 1
+        - 0
         - !GetAZs 
           Ref: 'AWS::Region'
       VpcId: !Ref "VPC"
       CidrBlock: "10.0.1.0/24"    
+
+  RouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
 
   InternetGateway:
     Type: "AWS::EC2::InternetGateway"
@@ -47,20 +122,33 @@ Resources:
       GatewayId: !Ref InternetGateway
       RouteTableId: !Ref RouteTable
 
-  SubnetARouteTableAssociation:
+  PublicSubnetRouteTableAssociation:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties:
       RouteTableId: !Ref RouteTable
       SubnetId: !Ref PublicSubnet
 
-  
-
-  RouteTable:
-    Type: "AWS::EC2::RouteTable"
-    Properties:
-      VpcId: !Ref VPC
-
 Outputs:
   VpcId:
     Description: The VPC ID
     Value: !Ref VPC
+
+  BastionHostIP:
+    Description: The Public Ip
+    Value: !GetAtt BastionEC2Instance.PublicIp
+  PrivateInstanceIp:
+    Description: The Private Ip of host
+    Value: !GetAtt PrivateEC2Instance.PrivateIp
+  ConnectionCMD:
+    Value:
+      !Join [
+        "",
+        [
+          ssh -A -J ec2-user@,
+          !GetAtt BastionEC2Instance.PublicIp,
+          " ",
+          ec2-user@,
+          !GetAtt PrivateEC2Instance.PrivateIp,
+        ],
+      ]
+    Description: Copy and run it in your shell  
