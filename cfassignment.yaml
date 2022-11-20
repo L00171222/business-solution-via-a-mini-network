@@ -1,4 +1,5 @@
 Parameters:
+#Secret Access key input parameter for bastion host and app instance
   KeyName:
     Description: Amazon EC2 KeyPair
     Type: AWS::EC2::KeyPair::KeyName
@@ -9,76 +10,38 @@ Parameters:
   DBPassword:
     Type: "String"   
 
-  
-    
-
 Mappings:
   RegionMap:
     us-east-1:
-      AMI: ami-1853ac65
+      AMI: ami-0b0dcb5067f052a63 # Amazon instance id
     us-west-1:
-      AMI: ami-bf5540df
+      AMI: ami-0f5e8a042c8bfcd5e
+    us-east-2:
+      AMI: ami-0beaa649c482330f7
+    us-west-2:
+      AMI: ami-094125af156557ca2     
     eu-west-1:
-      AMI: ami-3bfab942
+      AMI: ami-01cae1550c0adea9c
     ap-southeast-1:
-      AMI: ami-e2adf99e
+      AMI: ami-0af2f764c580cc1f9
     ap-southeast-2:
-      AMI: ami-43874721
+      AMI: ami-06bb074d1e196d0d4
     ap-south-1:
-      AMI: ami-0ebc1ac48dfd14136
+      AMI: ami-074dc0a6f6c764218
+    ca-central-1:
+      AMI: ami-0ee679ef733e3b8e7
+    eu-central-1:
+      AMI: ami-076309742d466ad69
+    eu-west-2:
+      AMI: ami-04706e771f950937f
+    eu-west-3:
+      AMI: ami-0f15e0a4c8d3ee5fe
+    eu-north-1:
+      AMI: ami-02aeff1a953c5c2ff
+    sa-east-1:
+      AMI: ami-0b7101e993ea27f3
 
 Resources: 
- 
-
-    
-  BastionEC2Instance:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t2.micro
-      ImageId:
-        Fn::FindInMap:
-          - RegionMap
-          - !Ref AWS::Region
-          - AMI
-      Tags:
-        - Key: Name
-          Value: "Bastion Host"
-      KeyName: !Ref KeyName
-      NetworkInterfaces:
-        - AssociatePublicIpAddress: "true"
-          DeviceIndex: "0"
-          GroupSet:
-            - Ref: "MySecurityGroup"
-          SubnetId:
-            Ref: "PublicSubnet"
-
-  PrivateEC2Instance:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t2.micro
-      ImageId:
-        Fn::FindInMap:
-          - RegionMap
-          - !Ref AWS::Region
-          - AMI
-      SecurityGroupIds:
-        - !Ref MySecurityGroup
-      SubnetId: !Ref PrivateSubnet
-      Tags:
-        - Key: Name
-          Value: "Private Instance"
-      KeyName: !Ref KeyName          
-  
-  MySecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Open Port 22 for ssh
-      VpcId: !Ref "VPC" 
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: "22"
-          ToPort: "22"
-          CidrIp: 0.0.0.0/0
   VPC:
     Type: "AWS::EC2::VPC"
     Properties:
@@ -87,76 +50,6 @@ Resources:
       Tags:
       - Key: "Name"
         Value: !Ref "Tag"
-
-  PrivateSubnet:
-    Type: "AWS::EC2::Subnet"
-    Properties:
-      AvailabilityZone: !Select 
-        - 0
-        - !GetAZs 
-          Ref: 'AWS::Region'
-      VpcId: !Ref "VPC"
-      CidrBlock: "10.0.0.0/24"
-
-  SubnetA:
-    Type: "AWS::EC2::Subnet"
-    Properties:
-      AvailabilityZone: !Select 
-        - 0
-        - !GetAZs 
-          Ref: 'AWS::Region'
-      VpcId: !Ref "VPC"
-      CidrBlock: "10.0.1.0/24"
-
-  SubnetB:
-    Type: "AWS::EC2::Subnet"
-    Properties:
-      AvailabilityZone: !Select 
-        - 1
-        - !GetAZs 
-          Ref: 'AWS::Region'
-      VpcId: !Ref "VPC"
-      CidrBlock: "10.0.2.0/24"
-
-  SubnetGroup:
-    Type: "AWS::RDS::DBSubnetGroup"
-    Properties:
-      DBSubnetGroupName: "subnetgroup"
-      DBSubnetGroupDescription: "Subnet Group"
-      SubnetIds:
-      - !Ref "SubnetA"
-      - !Ref "SubnetB"
-
-  InstanceSecurityGroup:
-    Type: "AWS::EC2::SecurityGroup"
-    Properties:
-      GroupName: "Example Security Group"
-      GroupDescription: "RDS traffic"
-      VpcId: !Ref "VPC"
-      SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: 3306
-        ToPort: 3306
-        CidrIp: "10.0.0.0/16"
-      Tags:
-        - Key: Name
-          Value: DataBase Security Group
-    
-  RDSCluster:
-    Type: "AWS::RDS::DBInstance"
-    Properties:
-      DBSubnetGroupName: !Ref "SubnetGroup"
-      MasterUsername: !Ref "DBUsername"
-      MasterUserPassword: !Ref "DBPassword"
-      DBInstanceClass: db.t3.micro
-      Engine: "MySQL"
-      VPCSecurityGroups: 
-      - !Ref InstanceSecurityGroup
-      StorageType: gp2
-      AllocatedStorage: 20
-
-
-
 
   PublicSubnet:
     Type: "AWS::EC2::Subnet"
@@ -194,6 +87,142 @@ Resources:
     Properties:
       RouteTableId: !Ref RouteTable
       SubnetId: !Ref PublicSubnet
+ 
+
+  # JumpBox  
+  BastionEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId:
+        Fn::FindInMap:
+          - RegionMap
+          - !Ref AWS::Region
+          - AMI
+      Tags:
+        - Key: Name
+          Value: "Bastion Host"
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - Ref: BastionHostSecurityGroup
+          SubnetId:
+            Ref: "PublicSubnet"
+  
+  AppInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId:
+        Fn::FindInMap:
+          - RegionMap
+          - !Ref AWS::Region
+          - AMI
+      SecurityGroupIds:
+        - !Ref AppInstanceSecurityGroup
+      SubnetId: !Ref PrivateSubnet
+      Tags:
+        - Key: Name
+          Value: "Private Instance"
+      KeyName: !Ref KeyName          
+  
+  #Security Group of JumpBox
+  BastionHostSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open Port 22 for ssh
+      VpcId: !Ref "VPC" 
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: "22"
+          ToPort: "22"
+          CidrIp: 0.0.0.0/0
+  
+  #Security Group of AppInstance
+  AppInstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable HTTP/HTTPS access via port 80/443 locked down to the load balancer SG + SSH access via port 22 locked down SSH SG
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          SourceSecurityGroupId: !Ref BastionHostSecurityGroup
+      Tags:
+        - Key: Name
+          Value: WebServer Security Group
+      VpcId: !Ref VPC
+
+  PrivateSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select 
+        - 0
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      VpcId: !Ref "VPC"
+      CidrBlock: "10.0.0.0/24"
+
+  PrivateSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select 
+        - 0
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      VpcId: !Ref "VPC"
+      CidrBlock: "10.0.1.0/24"
+
+  PrivateSubnet3:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select 
+        - 1
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      VpcId: !Ref "VPC"
+      CidrBlock: "10.0.2.0/24"
+
+  # Database Subnet Group
+  SubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupName: "subnetgroup"
+      DBSubnetGroupDescription: "Subnet Group"
+      SubnetIds:
+      - !Ref "PrivateSubnet2"
+      - !Ref "PrivateSubnet3"
+
+  DataBaseSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "Example Security Group"
+      GroupDescription: "RDS traffic"
+      VpcId: !Ref "VPC"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+        CidrIp: "10.0.0.0/16"
+      Tags:
+        - Key: Name
+          Value: DataBase Security Group
+
+  # Amazon RDS Database Instance    
+  RDS:
+    Type: "AWS::RDS::DBInstance"
+    Properties:
+      DBSubnetGroupName: !Ref "SubnetGroup"
+      MasterUsername: !Ref "DBUsername"
+      MasterUserPassword: !Ref "DBPassword"
+      DBInstanceClass: db.t3.micro
+      Engine: "MySQL"
+      VPCSecurityGroups: 
+      - !Ref DataBaseSecurityGroup
+      StorageType: gp2
+      AllocatedStorage: 20
 
 Outputs:
   VpcId:
@@ -205,17 +234,17 @@ Outputs:
     Value: !GetAtt BastionEC2Instance.PublicIp
   PrivateInstanceIp:
     Description: The Private Ip of host
-    Value: !GetAtt PrivateEC2Instance.PrivateIp
+    Value: !GetAtt AppInstance.PrivateIp
   ConnectionCMD:
     Value:
       !Join [
         "",
         [
           ssh -A -J ec2-user@,
-          !GetAtt BastionEC2Instance.PublicIp,
+          !GetAtt BastionEC2Instance.PublicIp,     #SSh Command to connect to instance
           " ",
           ec2-user@,
-          !GetAtt PrivateEC2Instance.PrivateIp,
+          !GetAtt AppInstance.PrivateIp,
         ],
       ]
     Description: Copy and run it in your shell  
