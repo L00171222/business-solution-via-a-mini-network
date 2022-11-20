@@ -144,7 +144,7 @@ Resources:
   AppInstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupDescription: Enable HTTP/HTTPS access via port 80/443 locked down to the load balancer SG + SSH access via port 22 locked down SSH SG
+      GroupDescription: SSH access via port 22 
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: '22'
