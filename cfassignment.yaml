@@ -3,7 +3,14 @@ Parameters:
     Description: Amazon EC2 KeyPair
     Type: AWS::EC2::KeyPair::KeyName
   Tag: 
-    Type: String
+    Type: "String"
+  DBUsername:
+    Type: "String" 
+  DBPassword:
+    Type: "String"   
+
+  
+    
 
 Mappings:
   RegionMap:
@@ -21,7 +28,9 @@ Mappings:
       AMI: ami-0ebc1ac48dfd14136
 
 Resources: 
-  
+ 
+
+    
   BastionEC2Instance:
     Type: AWS::EC2::Instance
     Properties:
@@ -89,7 +98,65 @@ Resources:
       VpcId: !Ref "VPC"
       CidrBlock: "10.0.0.0/24"
 
-      
+  SubnetA:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select 
+        - 0
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      VpcId: !Ref "VPC"
+      CidrBlock: "10.0.1.0/24"
+
+  SubnetB:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select 
+        - 1
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      VpcId: !Ref "VPC"
+      CidrBlock: "10.0.2.0/24"
+
+  SubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupName: "subnetgroup"
+      DBSubnetGroupDescription: "Subnet Group"
+      SubnetIds:
+      - !Ref "SubnetA"
+      - !Ref "SubnetB"
+
+  InstanceSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "Example Security Group"
+      GroupDescription: "RDS traffic"
+      VpcId: !Ref "VPC"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+        CidrIp: "10.0.0.0/16"
+      Tags:
+        - Key: Name
+          Value: DataBase Security Group
+    
+  RDSCluster:
+    Type: "AWS::RDS::DBInstance"
+    Properties:
+      DBSubnetGroupName: !Ref "SubnetGroup"
+      MasterUsername: !Ref "DBUsername"
+      MasterUserPassword: !Ref "DBPassword"
+      DBInstanceClass: db.t3.micro
+      Engine: "MySQL"
+      VPCSecurityGroups: 
+      - !Ref InstanceSecurityGroup
+      StorageType: gp2
+      AllocatedStorage: 20
+
+
+
 
   PublicSubnet:
     Type: "AWS::EC2::Subnet"
@@ -99,7 +166,7 @@ Resources:
         - !GetAZs 
           Ref: 'AWS::Region'
       VpcId: !Ref "VPC"
-      CidrBlock: "10.0.1.0/24"    
+      CidrBlock: "10.0.3.0/24"    
 
   RouteTable:
     Type: "AWS::EC2::RouteTable"
